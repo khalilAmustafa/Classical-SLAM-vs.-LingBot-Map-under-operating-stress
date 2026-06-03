@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARES-NEXUS · Layer 1 Architecture Trade-off</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F4F1EA;
+    --ink:#1B1A17;
+    --muted:#6B675E;
+    --line:#D8D2C5;
+    --line-strong:#BCB4A2;
+    --card:#FBFAF6;
+    --slam:#3A5A7A;
+    --ling:#C2410C;
+    --slam-soft:rgba(58,90,122,.10);
+    --ling-soft:rgba(194,65,12,.10);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--paper);
+    background-image:linear-gradient(var(--line) .5px,transparent .5px),linear-gradient(90deg,var(--line) .5px,transparent .5px);
+    background-size:28px 28px;
+    background-position:-1px -1px;
+    color:var(--ink);
+    font-family:'IBM Plex Sans',sans-serif;
+    line-height:1.6;
+    padding:40px 20px 64px;
+    display:flex;justify-content:center;
+  }
+  .sheet{
+    width:100%;max-width:1040px;background:var(--paper);
+    border:1px solid var(--line-strong);
+    padding:40px clamp(20px,4vw,52px) 44px;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.22em;
+    text-transform:uppercase;color:var(--muted);margin:0 0 14px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .eyebrow::before{content:"";width:26px;height:1px;background:var(--ink)}
+  h1{
+    font-family:'Fraunces',serif;font-weight:600;font-size:clamp(28px,4.6vw,46px);
+    line-height:1.04;letter-spacing:-.01em;margin:0 0 12px;max-width:18ch;
+  }
+  .lede{font-size:15.5px;color:var(--muted);margin:0 0 32px;max-width:62ch}
+  .lede b{color:var(--ink);font-weight:500}
+
+  .controls{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:18px;
+  }
+  .ctl{background:var(--card);padding:18px 20px}
+  .ctl .top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px}
+  .ctl .name{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink);font-weight:500}
+  .ctl .val{font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:600}
+  .ctl .hint{font-size:12px;color:var(--muted);margin-top:12px;min-height:2.4em}
+
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;background:transparent;cursor:pointer;margin:0}
+  input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--line-strong)}
+  input[type=range]::-moz-range-track{height:2px;background:var(--line-strong)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;height:18px;width:18px;border-radius:50%;background:var(--ink);margin-top:-8px;border:3px solid var(--paper);box-shadow:0 0 0 1px var(--ink)}
+  input[type=range]::-moz-range-thumb{height:14px;width:14px;border-radius:50%;background:var(--ink);border:3px solid var(--paper);box-shadow:0 0 0 1px var(--ink)}
+
+  .presets{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:32px}
+  .presets button{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    background:transparent;color:var(--muted);border:1px solid var(--line-strong);
+    padding:7px 13px;cursor:pointer;transition:all .15s;
+  }
+  .presets button:hover{color:var(--ink);border-color:var(--ink)}
+  .presets button.active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+
+  .stage{display:grid;grid-template-columns:1.25fr .9fr;gap:36px;align-items:start}
+  @media(max-width:760px){.stage{grid-template-columns:1fr;gap:24px}}
+  .chart-wrap{position:relative;height:430px;width:100%}
+
+  .readout .who{display:flex;align-items:center;gap:9px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}
+  .dot{width:11px;height:11px;border-radius:2px;flex:none}
+  .verdict{border-left:2px solid var(--ink);padding:4px 0 4px 16px;margin:6px 0 26px}
+  .verdict .k{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+  .verdict p{margin:0;font-size:15px}
+  .verdict b{font-weight:600}
+
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line)}
+  .stat{background:var(--card);padding:14px 16px}
+  .stat .n{font-family:'IBM Plex Mono',monospace;font-size:21px;font-weight:600;line-height:1.1;color:var(--ling)}
+  .stat .l{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+  .note{margin-top:30px;border-top:1px solid var(--line-strong);padding-top:18px;font-size:12.5px;color:var(--muted);max-width:72ch}
+  .note b{color:var(--ink);font-weight:500}
+  footer{margin-top:18px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.06em;color:var(--muted)}
+  footer a{color:var(--muted)}
+</style>
+</head>
+<body>
+<main class="sheet">
+  <p class="eyebrow">ARES-NEXUS · Matchmaking Session · Layer 1 navigation engine</p>
+  <h1>Classical SLAM vs. LingBot-Map under operating stress</h1>
+  <p class="lede">Drag the operating conditions to see how each Layer 1 approach behaves. The honest story isn't "new beats old everywhere" &mdash; it's a <b>trade-off</b>: the AI foundation model dominates on resilience and map quality, while classical SLAM stays light on hardware. Use the presets to walk an engineer through specific flight regimes.</p>
+
+  <section class="controls">
+    <div class="ctl">
+      <div class="top"><span class="name">Velocity stress</span><span class="val" id="vVal">50</span></div>
+      <input type="range" id="v" min="0" max="100" value="50" step="1">
+      <div class="hint">Higher = faster flight, more motion blur. Classical feature tracking breaks down here.</div>
+    </div>
+    <div class="ctl">
+      <div class="top"><span class="name">Scene dynamism</span><span class="val" id="dVal">50</span></div>
+      <input type="range" id="d" min="0" max="100" value="50" step="1">
+      <div class="hint">Higher = more moving objects. Violates the static-world assumption SLAM relies on.</div>
+    </div>
+    <div class="ctl">
+      <div class="top"><span class="name">Onboard compute</span><span class="val" id="cVal">70</span></div>
+      <input type="range" id="c" min="0" max="100" value="70" step="1">
+      <div class="hint">Edge GPU budget (Jetson-class). The transformer needs this to stay real-time.</div>
+    </div>
+  </section>
+
+  <div class="presets" id="presets">
+    <button data-v="20" data-d="15" data-c="70">Calm indoor hover</button>
+    <button data-v="85" data-d="40" data-c="70">Fast outdoor sprint</button>
+    <button data-v="55" data-d="85" data-c="70">Cluttered / dynamic</button>
+    <button data-v="50" data-d="50" data-c="22">Low-power edge</button>
+  </div>
+
+  <section class="stage">
+    <div class="chart-wrap">
+      <canvas id="radar" role="img" aria-label="Radar chart comparing Traditional SLAM and LingBot-Map across drift resilience, fast-motion robustness, dynamic-scene robustness, map density, real-time performance, and hardware footprint. Scores update with the operating-condition sliders.">Radar comparison of the two navigation approaches across six axes.</canvas>
+    </div>
+
+    <div class="readout">
+      <div class="who"><span class="dot" style="background:var(--slam)"></span>Traditional SLAM</div>
+      <div class="who"><span class="dot" style="background:var(--ling)"></span>LingBot-Map &mdash; GCT foundation model</div>
+
+      <div class="verdict">
+        <div class="k">Read under current conditions</div>
+        <p id="verdict"></p>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="n">~20</div><div class="l">FPS, streaming on edge GPU</div></div>
+        <div class="stat"><div class="n">1</div><div class="l">RGB camera (LiDAR optional)</div></div>
+        <div class="stat"><div class="n">98.98</div><div class="l">ETH3D F1 reconstruction</div></div>
+        <div class="stat"><div class="n">10k+</div><div class="l">frames stable, low drift</div></div>
+      </div>
+    </div>
+  </section>
+
+  <p class="note"><b>Methodology &amp; honesty note.</b> The radar shows <b>illustrative relative positioning</b> under the conditions you select &mdash; it is a decision aid, not a head-to-head benchmark run. The fixed figures above are real, from Robbyant's LingBot-Map release (Apr 2026): ~20&nbsp;FPS streaming, ETH3D F1 of 98.98, and an Oxford Spires absolute trajectory error of 6.42&nbsp;m (≈2.8&times; better than the prior best streaming method). The architecture is a Geometric Context Transformer with three attention paths (anchor context, local pose window, trajectory memory). It is weeks old and <b>not yet flight-validated on UAVs</b> &mdash; benchmarks are largely ground/handheld &mdash; which is exactly why our plan includes running the open-source model over real GPS-denied drone footage as live proof.</p>
+
+  <footer>Source: Robbyant / Ant Group, LingBot-Map (open-source, Apr 2026) &middot; github.com/Robbyant/lingbot-map &middot; prepared for the Leonardo "Solvers Wanted" drone track</footer>
+</main>
+
+<script>
+  const clamp=(x,lo,hi)=>Math.max(lo,Math.min(hi,x));
+  const r=n=>Math.round(n);
+
+  const AXES=[
+    ['Long-flight','drift resilience'],
+    ['Fast-motion','robustness'],
+    ['Dynamic-scene','robustness'],
+    ['Map density','& detail'],
+    ['Real-time @','current compute'],
+    ['Low hardware','footprint (SWaP)']
+  ];
+
+  function model(v,d,c){
+    const slam=[
+      clamp(60 - .35*v - .30*d, 8, 95),
+      clamp(72 - .58*v,         8, 95),
+      clamp(72 - .58*d,         8, 95),
+      clamp(52 - .12*v,        20, 70),
+      clamp(86 - .10*v - .05*d,40, 95),
+      90
+    ];
+    const ling=[
+      clamp(92 - .06*v - .06*d,60, 98),
+      clamp(90 - .08*v,        55, 98),
+      clamp(88 - .08*d,        55, 98),
+      96,
+      clamp(8 + .92*c,          5,100),
+      32
+    ];
+    return [slam.map(r), ling.map(r)];
+  }
+
+  const ctx=document.getElementById('radar').getContext('2d');
+  const chart=new Chart(ctx,{
+    type:'radar',
+    data:{labels:AXES,datasets:[
+      {label:'Traditional SLAM',data:[],borderColor:'#3A5A7A',backgroundColor:'rgba(58,90,122,.12)',borderWidth:2,pointBackgroundColor:'#3A5A7A',pointBorderColor:'#F4F1EA',pointRadius:3,pointHoverRadius:5},
+      {label:'LingBot-Map',data:[],borderColor:'#C2410C',backgroundColor:'rgba(194,65,12,.12)',borderWidth:2,pointBackgroundColor:'#C2410C',pointBorderColor:'#F4F1EA',pointRadius:3,pointHoverRadius:5}
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      animation:{duration:280},
+      scales:{r:{
+        min:0,max:100,
+        angleLines:{color:'rgba(27,26,23,.14)'},
+        grid:{color:'rgba(27,26,23,.10)'},
+        ticks:{display:false,stepSize:25,backdropColor:'transparent'},
+        pointLabels:{color:'#1B1A17',font:{family:"'IBM Plex Mono', monospace",size:11,weight:'500'}}
+      }},
+      plugins:{legend:{display:false},tooltip:{
+        backgroundColor:'#1B1A17',titleFont:{family:"'IBM Plex Mono', monospace",size:11},
+        bodyFont:{family:"'IBM Plex Sans', sans-serif",size:12},padding:10,displayColors:true,
+        callbacks:{title:(items)=>AXES[items[0].dataIndex].join(' '),label:(it)=>it.dataset.label+': '+it.formattedValue+'/100'}
+      }}
+    }
+  });
+
+  const vEl=document.getElementById('v'),dEl=document.getElementById('d'),cEl=document.getElementById('c');
+
+  function verdict(v,d,c,slam,ling){
+    const resGap=((ling[0]+ling[1]+ling[2]+ling[3])-(slam[0]+slam[1]+slam[2]+slam[3]))/4;
+    const rt=ling[4];
+    if(rt<50)
+      return `At this compute budget, <b>LingBot-Map can't hold real-time</b> (${rt}/100) &mdash; classical SLAM stays viable on light hardware. Either spec a stronger Jetson, or this regime favours the lean approach.`;
+    if(v>=60||d>=60)
+      return `Under this stress, classical tracking degrades sharply while the transformer holds &mdash; a <b>+${r(resGap)}-point resilience edge</b> for LingBot-Map. This is the GNSS-denied case we pitch on.`;
+    if(resGap>18)
+      return `Even in calm conditions LingBot-Map leads on resilience and map detail (<b>+${r(resGap)} pts</b>), at the cost of heavier hardware. A clean "better brain, more compute" trade.`;
+    return `Conditions are gentle: both approaches perform well. The split is <b>resilience &amp; density (LingBot-Map)</b> vs <b>hardware efficiency (SLAM)</b> &mdash; pick by mission profile.`;
+  }
+
+  function render(){
+    const v=+vEl.value,d=+dEl.value,c=+cEl.value;
+    vVal.textContent=v;dVal.textContent=d;cVal.textContent=c;
+    const [slam,ling]=model(v,d,c);
+    chart.data.datasets[0].data=slam;
+    chart.data.datasets[1].data=ling;
+    chart.update();
+    document.getElementById('verdict').innerHTML=verdict(v,d,c,slam,ling);
+    syncPresets(v,d,c);
+  }
+
+  function syncPresets(v,d,c){
+    document.querySelectorAll('#presets button').forEach(b=>{
+      b.classList.toggle('active', +b.dataset.v===v && +b.dataset.d===d && +b.dataset.c===c);
+    });
+  }
+
+  document.querySelectorAll('#presets button').forEach(b=>{
+    b.addEventListener('click',()=>{vEl.value=b.dataset.v;dEl.value=b.dataset.d;cEl.value=b.dataset.c;render();});
+  });
+  [vEl,dEl,cEl].forEach(el=>el.addEventListener('input',render));
+  render();
+</script>
+</body>
+</html>
